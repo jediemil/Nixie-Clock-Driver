@@ -4,3 +4,4 @@ cmake-build-*/
 include
 lib
 test
+src/WiFiPass.h
