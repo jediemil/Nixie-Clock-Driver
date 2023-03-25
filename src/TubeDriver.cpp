@@ -4,7 +4,8 @@
 
 #include "TubeDriver.h"
 
-TubeDriver::TubeDriver(ShiftRegisterDriver* numRegisters, IN14Tube* tubesNUM, uint8_t numNUMTubes, ShiftRegisterDriver* scRegisters, IN19Tube* tubesSC, uint8_t numSCTubes) {
+TubeDriver::TubeDriver(ShiftRegisterDriver *numRegisters, IN14Tube **tubesNUM, uint8_t numNUMTubes,
+                       ShiftRegisterDriver *scRegisters, IN19Tube **tubesSC, uint8_t numSCTubes) {
     ShiftRegisterSC = scRegisters;
     ShiftRegisterNUM = numRegisters;
 
@@ -14,6 +15,49 @@ TubeDriver::TubeDriver(ShiftRegisterDriver* numRegisters, IN14Tube* tubesNUM, ui
     in19Tubes = tubesSC;
 }
 
-void TubeDriver::setVisibility(bool visible) {
+void TubeDriver::setNumber(int tube, int number) {
+    numDataTable[tube] = 0b1 << in14Tubes[tube]->lookup[number] % 12;
+    //Serial.printf("%u\n", numDataTable[tube]);
+}
 
+void TubeDriver::enableNumber(int tube, int number) {
+    numDataTable[tube] |= 0b1 << in14Tubes[tube]->lookup[number] % 12;
+}
+
+void TubeDriver::disableNumber(int tube, int number) {
+    numDataTable[tube] &= ~(0b1 << in14Tubes[tube]->lookup[number]) % 12;
+}
+
+void TubeDriver::showNUM() {
+    uint8_t shiftRegisterTable[6] = {0, 0, 0, 0, 0, 0};
+    /*shiftRegisterTable[0] = numDataTable[0] & 0xff;
+    shiftRegisterTable[1] = (numDataTable[0] >> 8 || numDataTable[1] << 4) & 0xff;
+    shiftRegisterTable[2] = (numDataTable[1] >> 4) & 0xff;
+    shiftRegisterTable[3] = numDataTable[2] & 0xff;
+    shiftRegisterTable[4] = (numDataTable[2] >> 8 || numDataTable[3] << 4) & 0xff;
+    shiftRegisterTable[5] = (numDataTable[3] >> 4) & 0xff;*/
+    for (int i = 3; i >= 0; i--) {
+        for (int8_t aBit = 11; aBit >= 0; aBit--) {
+            Serial.write(bitRead(numDataTable[i], aBit) ? '1' : '0');
+            int index = (i*12 + aBit) / 8;
+            int shift = (i*12 + aBit) % 8;
+            shiftRegisterTable[index] |= bitRead(numDataTable[i], aBit) << shift;
+        }
+    }
+    Serial.println("B");
+
+    ShiftRegisterNUM->sendData(shiftRegisterTable, 6);
+}
+
+void TubeDriver::setVisibility(bool visible) {
+    setVisibilityNUM(visible);
+    setVisibilitySC(visible);
+}
+
+void TubeDriver::setVisibilityNUM(bool visible) {
+    ShiftRegisterNUM->enable(visible);
+}
+
+void TubeDriver::setVisibilitySC(bool visible) {
+    ShiftRegisterSC->enable(visible);
 }

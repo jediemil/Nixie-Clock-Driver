@@ -31,10 +31,11 @@ void ShiftRegisterDriver::setFrequency(uint32_t freq) {
     this->freqDelay4 = 1000000 / freq / 4;
 }
 
-void ShiftRegisterDriver::sendData(uint8_t *data, unsigned int len) {
-    for (int i = 0; i < len; i++) {
+void ShiftRegisterDriver::sendData(uint8_t *data, int len) {
+    for (int i = len-1; i >= 0; i--) {
         for (int bit = 7; bit >= 0; bit--) {
             digitalWrite(dataPin, !((data[i] >> bit) & 0b1));
+            Serial.print(((data[i] >> bit) & 0b1));
             delayMicroseconds(freqDelay4);
             digitalWrite(clockPin, LOW);
             delayMicroseconds(freqDelay4);
@@ -43,6 +44,7 @@ void ShiftRegisterDriver::sendData(uint8_t *data, unsigned int len) {
             delayMicroseconds(freqDelay4);
         }
     }
+    Serial.println();
 
     delayMicroseconds(freqDelay4);
     digitalWrite(latchPin, LOW);

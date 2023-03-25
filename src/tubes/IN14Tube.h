@@ -8,7 +8,8 @@
 
 class IN14Tube {
 public:
-
+    explicit IN14Tube(int* lookup);
+    int* lookup;
 };
 
 

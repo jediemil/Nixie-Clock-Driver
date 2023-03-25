@@ -3,3 +3,7 @@
 //
 
 #include "IN14Tube.h"
+
+IN14Tube::IN14Tube(int *lookup) {
+    this->lookup = lookup;
+}

@@ -10,16 +10,16 @@
 
 class ShiftRegisterDriver {
 private:
-    uint8_t dataPin;
-    uint8_t clockPin;
-    uint8_t latchPin;
-    uint8_t enablePin;
-    uint32_t frequency;
-    uint32_t freqDelay4;
+    uint8_t dataPin{};
+    uint8_t clockPin{};
+    uint8_t latchPin{};
+    uint8_t enablePin{};
+    uint32_t frequency{};
+    uint32_t freqDelay4{};
 
 public:
     ShiftRegisterDriver(uint8_t dataPin, uint8_t clockPin, uint8_t latchPin, uint8_t enablePin);
-    void sendData(uint8_t* data, unsigned int len);
+    void sendData(uint8_t* data, int len);
     void begin();
     void setFrequency(uint32_t freq);
     void enable(bool enable);

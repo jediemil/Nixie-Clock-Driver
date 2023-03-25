@@ -1,11 +1,9 @@
 #include "main.h"
-#include "ShiftRegisterDriver.h"
-#include "TubeDriver.h"
 
 
 ShiftRegisterDriver ShiftRegisterNUM(26, 32, 33, 25);
 ShiftRegisterDriver ShiftRegisterSC(18, 17, 16, 4);
-TubeDriver tubes(&ShiftRegisterNUM, &ShiftRegisterSC);
+TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 0);
 
 void setup() {
     Serial.begin(115200);
@@ -61,14 +59,45 @@ void setup() {
 }
 
 void loop() {
-    delay(1000);
-    uint8_t shiftRegisterTable[8] = {
-            0b1 << 1, 0b1 << 7, 0b1 << 2, 0b1 << 3, 0b1 << 1, 0b1 << 3, 0b1 << 5, 0b1 << 5
-    };
-    ShiftRegisterNUM.sendData(shiftRegisterTable, 8);
-    ShiftRegisterSC.sendData(shiftRegisterTable, 8);
-    ShiftRegisterNUM.enable(true);
-    ShiftRegisterSC.enable(true);
+    delay(500);
+    ShiftRegisterNUM.enable(false);
+    delay(500);
+
+
+    /*for (uint8_t number = 0; number < 12; number++) {
+        uint8_t shiftRegisterTable[6] = {0, 0, 0, 0, 0, 0};
+
+        for (uint8_t tube = 0; tube < 4; tube++) {
+            uint8_t shift = tubeTable[tube]->lookup[number] % 8;
+            uint8_t index = tubeTable[tube]->lookup[number] / 8;
+            shiftRegisterTable[index] |= 0b1 << shift;
+        }
+        Serial.println(number);
+        ShiftRegisterNUM.sendData(shiftRegisterTable, 6);
+        delay(1000);
+    }*/
+    //ShiftRegisterSC.sendData(shiftRegisterTable, 8);
+    //ShiftRegisterSC.enable(true);
+
+    for (uint8_t number = 0; number < 12; number++) {
+        //uint8_t shiftRegisterTable[6] = {0, 0, 0, 0, 0, 0};
+        for (uint8_t tube = 0; tube < 4; tube++) {
+            tubes.setNumber(tube, number);
+            /*uint8_t shift = tubeTable[tube]->lookup[number] % 8;
+            uint8_t index = tubeTable[tube]->lookup[number] / 8;
+            shiftRegisterTable[index] |= 0b1 << shift;*/
+        }
+        /*for (int i = 5; i >= 0; i--) {
+            for (int8_t aBit = 7; aBit >= 0; aBit--)
+                Serial.write(bitRead(shiftRegisterTable[i], aBit) ? '1' : '0');
+        }
+        Serial.println("");*/
+        tubes.showNUM();
+        tubes.setVisibilityNUM(true);
+        delay(500);
+        ShiftRegisterNUM.enable(true);
+        delay(500);
+    }
 
     uint16_t adc_data = analogRead(HV_SENSE_PIN);
     double voltage = ((adc_data / 4095.0) * 3.3) / 2000.0 * 202000;

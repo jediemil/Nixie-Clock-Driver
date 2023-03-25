@@ -7,7 +7,9 @@
 
 
 class IN19Tube {
-
+public:
+    explicit IN19Tube(int* lookup);
+    int* lookup;
 };
 
 

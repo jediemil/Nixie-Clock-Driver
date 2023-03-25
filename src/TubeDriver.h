@@ -15,18 +15,27 @@ private:
     ShiftRegisterDriver* ShiftRegisterNUM;
     ShiftRegisterDriver* ShiftRegisterSC;
 
-    IN14Tube* in14Tubes;
-    IN19Tube* in19Tubes;
-    uint8_t numIN14;
-    uint8_t numIN19;
+    IN14Tube** in14Tubes;
+    IN19Tube** in19Tubes;
+    uint8_t numIN14{};
+    uint8_t numIN19{};
+
+    uint16_t numDataTable[4] = {0, 0, 0, 0};
+    uint16_t scDataTable[2] = {0, 0};
 
 public:
-    TubeDriver(ShiftRegisterDriver* numRegisters, IN14Tube* tubesNUM, uint8_t numNUMTubes, ShiftRegisterDriver* scRegisters, IN19Tube* tubesSC, uint8_t numSCTubes);
+    TubeDriver(ShiftRegisterDriver* numRegisters, IN14Tube** tubesNUM, uint8_t numNUMTubes, ShiftRegisterDriver* scRegisters, IN19Tube** tubesSC, uint8_t numSCTubes);
+    void showNUM();
+    void showSC();
     void show();
     void clear();
     void setNumber(int tube, int number);
+    void enableNumber(int tube, int number);
+    void disableNumber(int tube, int number);
     void setCharacter(int tube, char character);
     void setVisibility(bool visible);
+    void setVisibilityNUM(bool visible);
+    void setVisibilitySC(bool visible);
 };
 
 
