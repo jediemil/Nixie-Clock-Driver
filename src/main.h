@@ -7,6 +7,17 @@
 #include "./../.pio/libdeps/esp32dev/NeoPixelBus/src/NeoPixelBus.h"
 #include "ShiftRegisterDriver.h"
 #include "TubeDriver.h"
+#include "WiFi.h"
+#include <./../.pio/libdeps/esp32dev/AsyncTCP/src/AsyncTCP.h>
+#include "./../.pio/libdeps/esp32dev/ESP Async WebServer/src/ESPAsyncWebServer.h"
+#include "WiFiPass.h"
+#include <ESPmDNS.h>
+#include "SPIFFS.h"
+
+
+#include <Update.h>
+#define U_PART U_SPIFFS
+size_t content_len;
 
 
 #define BUZZER_PIN 21
@@ -15,6 +26,32 @@
 #define COLON_1_PIN 13
 #define COLON_2_PIN 27
 #define HV_SENSE_PIN 36
+
+AsyncWebServer server(80);
+
+const char file_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+</head>
+<body>
+  <p><h1>File Upload</h1></p>
+  <p>Free Storage: %FREESPIFFS% | Used Storage: %USEDSPIFFS% | Total Storage: %TOTALSPIFFS%</p>
+  <form method="POST" action="/upload" enctype="multipart/form-data"><input type="file" name="data"/><input type="submit" name="upload" value="Upload File" title="Upload File"></form>
+    <a href="/">Tillbaka</a>
+  <p>After clicking upload it will take some time for the file to firstly upload and then be written to SPIFFS, there is no indicator that the upload began.  Please be patient.</p>
+  <p>Once uploaded the page will refresh and the newly uploaded file will appear in the file list.</p>
+  <p>If a file does not appear, it will be because the file was too big, or had unusual characters in the file name (like spaces).</p>
+  <p>You can see the progress of the upload by watching the serial output.</p>
+  <p>%FILELIST%</p>
+
+    <h2>Upload BIN</h2>
+    <form method="POST" action="/doUpdate" enctype="multipart/form-data"><input type="file" name="data"/><input type="submit" name="upload" value="Upload BIN" title="Upload BIN"></form>
+</body>
+</html>
+)rawliteral";
 
 NeoPixelBus<NeoRgbFeature, NeoEsp32Rmt0800KbpsInvertedMethod> whiteStrip(NUM_LEDS, 22);
 NeoPixelBus<NeoGrb48Feature, NeoEsp32I2s0800KbpsInvertedMethod> RGBStrip(NUM_LEDS, 23);

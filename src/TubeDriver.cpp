@@ -41,7 +41,7 @@ void TubeDriver::showNUM() {
             Serial.write(bitRead(numDataTable[i], aBit) ? '1' : '0');
             int index = (i*12 + aBit) / 8;
             int shift = (i*12 + aBit) % 8;
-            shiftRegisterTable[index] |= bitRead(numDataTable[i], aBit) << shift;
+            shiftRegisterTable[index] |= bitRead(numDataTable[3-i], aBit) << shift;
         }
     }
     Serial.println("B");
