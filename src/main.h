@@ -13,7 +13,8 @@
 #include "WiFiPass.h"
 #include <ESPmDNS.h>
 #include "SPIFFS.h"
-
+#include <esp_task_wdt.h>
+#include "time.h"
 
 #include <Update.h>
 #define U_PART U_SPIFFS
@@ -26,6 +27,8 @@ size_t content_len;
 #define COLON_1_PIN 13
 #define COLON_2_PIN 27
 #define HV_SENSE_PIN 36
+
+#define tempInterval 5
 
 AsyncWebServer server(80);
 
@@ -48,7 +51,7 @@ const char file_html[] PROGMEM = R"rawliteral(
   <p>%FILELIST%</p>
 
     <h2>Upload BIN</h2>
-    <form method="POST" action="/doUpdate" enctype="multipart/form-data"><input type="file" name="data"/><input type="submit" name="upload" value="Upload BIN" title="Upload BIN"></form>
+    <form method="POST" action="/update" enctype="multipart/form-data"><input type="file" name="data"/><input type="submit" name="upload" value="Upload BIN" title="Upload BIN"></form>
 </body>
 </html>
 )rawliteral";

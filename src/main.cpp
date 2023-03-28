@@ -4,6 +4,8 @@ ShiftRegisterDriver ShiftRegisterNUM(26, 32, 33, 25);
 ShiftRegisterDriver ShiftRegisterSC(18, 17, 16, 4);
 TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 0);
 
+TaskHandle_t normalTubeRunnerHandle;
+
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
@@ -181,13 +183,154 @@ void startServer() {
         request->send(200);
     }, handleUpload);
 
-    server.on("/doUpdate", HTTP_POST,
+    server.on("/update", HTTP_POST,
               [](AsyncWebServerRequest *request) {},
               [](AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data,
                  size_t len, bool final) {
                   handleDoUpdate(request, filename, index, data, len, final);
               });
     Update.onProgress(printProgress);
+
+    server.on("/reset", HTTP_POST,[](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("text/plain");
+        response->addHeader("Access-Control-Allow-Origin","*");
+        response->addHeader("Access-Control-Allow-Headers", "Content-Type, data");
+        response->addHeader("Access-Control-Allow-Methods", "POST, GET");
+        response->setCode(200);
+        request->send(response);
+
+        delay(500);
+
+        ESP.restart();
+    });
+}
+
+void printLocalTime(){
+    struct tm timeinfo;
+    if(!getLocalTime(&timeinfo)){
+        Serial.println("Failed to obtain time");
+        return;
+    }
+    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+    Serial.print("Day of week: ");
+    Serial.println(&timeinfo, "%A");
+    Serial.print("Month: ");
+    Serial.println(&timeinfo, "%B");
+    Serial.print("Day of Month: ");
+    Serial.println(&timeinfo, "%d");
+    Serial.print("Year: ");
+    Serial.println(&timeinfo, "%Y");
+    Serial.print("Hour: ");
+    Serial.println(&timeinfo, "%H");
+    Serial.print("Hour (12 hour format): ");
+    Serial.println(&timeinfo, "%I");
+    Serial.print("Minute: ");
+    Serial.println(&timeinfo, "%M");
+    Serial.print("Second: ");
+    Serial.println(&timeinfo, "%S");
+
+    Serial.println("Time variables");
+    char timeHour[3];
+    strftime(timeHour,3, "%H", &timeinfo);
+    Serial.println(timeHour);
+    char timeWeekDay[10];
+    strftime(timeWeekDay,10, "%A", &timeinfo);
+    Serial.println(timeWeekDay);
+    Serial.println();
+}
+
+unsigned long getTimeUnix() {
+    time_t now;
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        //Serial.println("Failed to obtain time");
+        return(0);
+    }
+    time(&now);
+    return now;
+}
+
+void antiCathodePoisonRoutine(int speed, bool reset) {
+    for (uint8_t number = 0; number < 12; number++) {
+        for (uint8_t tube = 0; tube < 4; tube++) {
+            tubes.setNumber(tube, number);
+        }
+        tubes.showNUM();
+        delay(speed);
+        if (reset) esp_task_wdt_reset();
+    }
+}
+
+[[noreturn]] void normalTubeLoop(void * parameter) {
+    tubes.setVisibilityNUM(true);
+    while (true) {
+        struct tm timeStart;
+        getLocalTime(&timeStart);
+        bool showTime = true;
+        while (showTime) {
+            struct tm timeNow;
+            getLocalTime(&timeNow);
+
+            int hour = timeNow.tm_hour;
+            tubes.setNumber(0, hour/10); //Int division -> remove the last digit
+            tubes.setNumber(1, hour%10);
+
+            int minute = timeNow.tm_min;
+            tubes.setNumber(2, minute/10);
+            tubes.setNumber(3, minute%10);
+
+            tubes.showNUM();
+
+            if (minute % 5 == 0) {
+                showTime = false;
+            }
+
+            for (int i = 0; i < 30 - timeNow.tm_sec/2; i++) {
+                digitalWrite(COLON_1_PIN, LOW);
+                digitalWrite(COLON_2_PIN, LOW);
+                delay(1000);
+                digitalWrite(COLON_1_PIN, HIGH);
+                digitalWrite(COLON_2_PIN, HIGH);
+                delay(1000);
+                esp_task_wdt_reset();
+            }
+        }
+        digitalWrite(COLON_1_PIN, LOW);
+        digitalWrite(COLON_2_PIN, LOW);
+
+        antiCathodePoisonRoutine(1000, true); //TODO: Every five minutes is just a made up number. Research the best time spend doing this.
+        // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
+        //Show temp and date here
+        tubes.setVisibility(false);
+        struct tm timeNow;
+        getLocalTime(&timeNow);
+
+        int day = timeNow.tm_mday;
+        tubes.setNumber(0, day/10); //Int division -> remove the last digit
+        tubes.setNumber(1, day%10);
+
+        int month = timeNow.tm_mon + 1;
+        tubes.setNumber(2, month/10);
+        tubes.setNumber(3, month%10);
+        //Display something on SC Tubes?
+        tubes.showNUM();
+
+        delay(1000);
+        digitalWrite(COLON_1_PIN, HIGH);
+        digitalWrite(COLON_2_PIN, HIGH);
+        delay(1000);
+        tubes.setVisibility(true);
+
+        delay(3000);
+        esp_task_wdt_reset();
+        delay(3000);
+        esp_task_wdt_reset();
+
+        digitalWrite(COLON_1_PIN, LOW);
+        digitalWrite(COLON_2_PIN, LOW);
+
+        antiCathodePoisonRoutine(1000, true);
+    }
 }
 
 void setup() {
@@ -215,7 +358,7 @@ void setup() {
     whiteStrip.Show();
 
     RGBStrip.Begin();
-    RGBStrip.ClearTo(Rgb48Color(40, 0, 50));
+    RGBStrip.ClearTo(Rgb48Color(40 << 8, 0, 50 << 8));
     RGBStrip.Show();
 
     Serial.println("LEDs started");
@@ -250,6 +393,9 @@ void setup() {
     startServer();
     server.begin();
 
+    configTime(3600, 3600, "pool.ntp.org");
+    printLocalTime();
+
     Serial.println("WebServer Started");
     delay(100);
     Serial.println("Setup done");
@@ -271,61 +417,50 @@ void setup() {
     RGBStrip.ClearTo(Rgb48Color(0, 0, 0));
     RGBStrip.Show();
 
+    delay(100);
+    Serial.println("Configuring WDT and tube normal setup");
+
+
+    xTaskCreate(
+            normalTubeLoop,
+            "Tube Normal Task",
+            1000,
+            NULL,
+            1,
+            &normalTubeRunnerHandle            // Task handle
+    );
+    esp_task_wdt_init(5, true); //enable panic so ESP32 restarts, 5 seconds
+    esp_task_wdt_add(NULL); //add current thread to WDT watch
+    esp_task_wdt_add(normalTubeRunnerHandle);
+
+    Serial.println("WDT and tube started");
+
     digitalWrite(PSU_EN_PIN, HIGH);
 }
 
 void loop() {
+    delay(2000);
+    esp_task_wdt_reset(); // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
+
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.print(millis());
+        Serial.println("Reconnecting to WiFi...");
+        WiFi.disconnect();
+        WiFi.reconnect();
+    }
+
+    //printLocalTime();
+
     /*for (uint8_t number = 0; number < 12; number++) {
-        uint8_t shiftRegisterTable[6] = {0, 0, 0, 0, 0, 0};
-
-        for (uint8_t tube = 0; tube < 4; tube++) {
-            uint8_t shift = tubeTable[tube]->lookup[number] % 8;
-            uint8_t index = tubeTable[tube]->lookup[number] / 8;
-            shiftRegisterTable[index] |= 0b1 << shift;
-        }
-        Serial.println(number);
-        ShiftRegisterNUM.sendData(shiftRegisterTable, 6);
-        delay(1000);
-    }*/
-    //ShiftRegisterSC.sendData(shiftRegisterTable, 8);
-    //ShiftRegisterSC.enable(true);
-
-    for (uint8_t number = 0; number < 12; number++) {
-        //uint8_t shiftRegisterTable[6] = {0, 0, 0, 0, 0, 0};
         for (uint8_t tube = 0; tube < 4; tube++) {
             tubes.setNumber(tube, (number + tube)%12);
-            /*uint8_t shift = tubeTable[tube]->lookup[number] % 8;
-            uint8_t index = tubeTable[tube]->lookup[number] / 8;
-            shiftRegisterTable[index] |= 0b1 << shift;*/
         }
-        /*for (int i = 5; i >= 0; i--) {
-            for (int8_t aBit = 7; aBit >= 0; aBit--)
-                Serial.write(bitRead(shiftRegisterTable[i], aBit) ? '1' : '0');
-        }
-        Serial.println("");*/
         tubes.showNUM();
         tubes.setVisibilityNUM(true);
         delay(1000);
-    }
+    }*/
 
     uint16_t adc_data = analogRead(HV_SENSE_PIN);
     double voltage = ((adc_data / 4095.0) * 3.3) / 2000.0 * 202000;
     Serial.println(voltage);
-
-    /*whiteStrip.SetPixelColor(0, RgbColor(20, 0, 0));
-    whiteStrip.SetPixelColor(1, RgbColor(0, 20, 0));
-    whiteStrip.SetPixelColor(2, RgbColor(0, 0, 20));
-    whiteStrip.Show();
-
-    RGBStrip.SetPixelColor(0, Rgb48Color(20, 0, 0));
-    RGBStrip.SetPixelColor(1, Rgb48Color(0, 20, 0));
-    RGBStrip.SetPixelColor(2, Rgb48Color(0, 0, 20));
-    RGBStrip.Show();
-    digitalWrite(STATUS_LED, LOW);
-    delay(100);
-    digitalWrite(STATUS_LED, HIGH);
-    //Serial.println("Alive");
-    delay(100);*/
-
-
 }
