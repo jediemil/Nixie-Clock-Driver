@@ -358,7 +358,10 @@ void setup() {
     whiteStrip.Show();
 
     RGBStrip.Begin();
-    RGBStrip.ClearTo(Rgb48Color(40 << 8, 0, 50 << 8));
+    //RGBStrip.ClearTo(Rgb48Color(40 << 8, 0, 50 << 8)); // Stupid ClearTo function does not work for 16-bit and I wasted 1 hour of my life.
+    RGBStrip.SetPixelColor(0, Rgb48Color(255, 0, 0));
+    RGBStrip.SetPixelColor(1, Rgb48Color(0, 255, 0));
+    RGBStrip.SetPixelColor(2, Rgb48Color(0, 0, 255));
     RGBStrip.Show();
 
     Serial.println("LEDs started");
@@ -414,12 +417,12 @@ void setup() {
     whiteStrip.ClearTo(RgbColor(0, 0, 0));
     whiteStrip.Show();
 
-    RGBStrip.ClearTo(Rgb48Color(0, 0, 0));
+    //RGBStrip.ClearTo(Rgb48Color(0, 0, 0));
+    RGBStrip.ClearTo(RgbColor(0, 0, 0));
     RGBStrip.Show();
 
     delay(100);
     Serial.println("Configuring WDT and tube normal setup");
-
 
     xTaskCreate(
             normalTubeLoop,
@@ -441,6 +444,9 @@ void setup() {
 void loop() {
     delay(2000);
     esp_task_wdt_reset(); // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
+
+    // https://www.manula.com/manuals/daliborfarny-com/nixie-tubes/1/en/topic/cathode-poisoning-prevention-routine
+    // For Dalibor Farny Tubes use ratio 60 : 0.2 seconds.
 
     if (WiFi.status() != WL_CONNECTED) {
         Serial.print(millis());
