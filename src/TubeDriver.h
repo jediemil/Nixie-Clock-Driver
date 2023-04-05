@@ -17,8 +17,8 @@ private:
 
     IN14Tube** in14Tubes;
     IN19Tube** in19Tubes;
-    uint8_t numIN14{};
-    uint8_t numIN19{};
+    uint8_t numIN14;
+    uint8_t numIN19;
 
     uint16_t numDataTable[4] = {0, 0, 0, 0};
     uint16_t scDataTable[2] = {0, 0};
