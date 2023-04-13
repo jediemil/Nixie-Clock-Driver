@@ -15,10 +15,19 @@
 #include "SPIFFS.h"
 #include <esp_task_wdt.h>
 #include "time.h"
+#include <HTTPClient.h>
+#include <ArduinoJSON.h>
+
 
 #include <Update.h>
+
+#ifndef NIXIECLOCK_MAIN_H
+#define NIXIECLOCK_MAIN_H
+
 #define U_PART U_SPIFFS
 size_t content_len;
+
+TaskHandle_t normalTubeRunnerHandle;
 
 
 #define BUZZER_PIN 21
@@ -28,7 +37,10 @@ size_t content_len;
 #define COLON_2_PIN 27
 #define HV_SENSE_PIN 36
 
-#define tempInterval 5
+#define LEFT_COMMA 10
+#define RIGHT_COMMA 11
+
+#define TEMP_INTERVAL 5
 
 AsyncWebServer server(80);
 
@@ -73,7 +85,10 @@ auto tube4 = new IN14Tube(lookup4);
 
 static IN14Tube* tubeTable[] = {tube1, tube2, tube3, tube4};
 
-#ifndef NIXIECLOCK_MAIN_H
-#define NIXIECLOCK_MAIN_H
+ShiftRegisterDriver ShiftRegisterNUM(26, 32, 33, 25);
+ShiftRegisterDriver ShiftRegisterSC(18, 17, 16, 4);
+TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 0);
+
+
 
 #endif //NIXIECLOCK_MAIN_H

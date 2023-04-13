@@ -1,11 +1,5 @@
 #include "main.h"
 
-ShiftRegisterDriver ShiftRegisterNUM(26, 32, 33, 25);
-ShiftRegisterDriver ShiftRegisterSC(18, 17, 16, 4);
-TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 0);
-
-TaskHandle_t normalTubeRunnerHandle;
-
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
@@ -250,15 +244,160 @@ unsigned long getTimeUnix() {
     return now;
 }
 
+void setColonVis(bool visibility) {
+    digitalWrite(COLON_1_PIN, visibility);
+    digitalWrite(COLON_2_PIN, visibility);
+}
+
 void antiCathodePoisonRoutine(int speed, bool reset) {
     for (uint8_t number = 0; number < 12; number++) {
-        for (uint8_t tube = 0; tube < 4; tube++) {
-            tubes.setNumber(tube, number);
-        }
+        tubes.clearNUMTo(number);
         tubes.showNUM();
         delay(speed);
         if (reset) esp_task_wdt_reset();
     }
+}
+
+String getValue(HTTPClient &http, String key, int skip, int get) {
+    bool found = false, look = false;
+    int ind = 0;
+    String ret_str = "";
+
+    int len = http.getSize();
+    char char_buff[1];
+    WiFiClient * stream = http.getStreamPtr();
+    while (http.connected() && (len > 0 || len == -1)) {
+        size_t size = stream->available();
+        if (size) {
+            int c = stream->readBytes(char_buff, ((size > sizeof(char_buff)) ? sizeof(char_buff) : size));
+            if (len > 0)
+                len -= c;
+            if (found) {
+                if (skip == 0) {
+                    ret_str += char_buff[0];
+                    get --;
+                } else
+                    skip --;
+                if (get <= 0)
+                    break;
+            }
+            else if ((!look) && (char_buff[0] == key[0])) {
+                look = true;
+                ind = 1;
+            } else if (look && (char_buff[0] == key[ind])) {
+                ind ++;
+                if (ind == key.length()) found = true;
+            } else if (look && (char_buff[0] != key[ind])) {
+                ind = 0;
+                look = false;
+            }
+        }
+    }
+    return ret_str;
+}
+
+String serverName = "http://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/16/lat/58/data.json";
+
+void showWeather() {
+    WiFiClient client;
+    HTTPClient http;
+
+    // Your Domain name with URL path or IP address with path
+    http.begin(client, serverName);
+    http.useHTTP10(true);
+    int httpResponseCode = http.GET();
+    //Serial.println(getValue(http, "2023-04-13T19:00:00Z", 3, 4));
+    /*DynamicJsonDocument doc(1024*5);
+    deserializeJson(doc, http.getStream());
+    String time = doc["approvedTime"];
+    Serial.println(time);
+    DynamicJsonDocument doc2(1024*5);
+    deserializeJson(doc2, doc["timeSeries"]);
+    float temp = doc2[0]["parameters"][0]["values"][0];
+    String name = doc2[1]["parameters"][0]["name"];
+    Serial.println(temp);
+    Serial.println(name);*/
+    DynamicJsonDocument doc(2048*3);
+    deserializeJson(doc, http.getStream());
+    JsonArray array = doc["timeSeries"].as<JsonArray>();
+    for(JsonVariant v : array) {
+        int type = v["parameters"][0]["values"][0];
+        const char* value = v["parameters"][0]["name"];
+        Serial.println(type);
+        Serial.println(value);
+    }
+
+    /*String payload = http.getString();
+
+    if (httpResponseCode>0) {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        payload = http.getString();
+    }
+    else {
+        Serial.print("Error code: ");
+        Serial.println(httpResponseCode);
+    }
+    // Free resources
+
+    esp_task_wdt_reset();
+
+    Serial.println("Deserial");
+    Serial.println(payload);
+    delay(100);
+    DynamicJsonDocument doc(1024*4);
+    deserializeJson(doc, http.getString());
+    Serial.println("Read");
+    delay(100);
+    float temp = doc["timeSeries"][4]["parameters"][10]["values"][0];
+    String name = doc["timeSeries"][4]["parameters"][10]["name"];
+    Serial.println(temp);
+    Serial.println(name);*/
+
+    http.end();
+}
+
+void showDate() {
+    setColonVis(false);
+
+    antiCathodePoisonRoutine(1000, true); //TODO: Every five minutes is just a made up number. Research the best time spend doing this.
+    // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
+    //Show temp and date here
+    tubes.setVisibility(false);
+    struct tm timeNow;
+    getLocalTime(&timeNow);
+
+    int day = timeNow.tm_mday;
+    tubes.setNumber(0, day/10); //Int division -> remove the last digit
+    tubes.setNumber(1, day%10);
+
+    int month = timeNow.tm_mon + 1;
+    tubes.setNumber(2, month/10);
+    tubes.setNumber(3, month%10);
+    //Display something on SC Tubes?
+    tubes.showNUM();
+
+    delay(1000);
+    setColonVis(true);
+    delay(1000);
+    tubes.setVisibility(true);
+
+    delay(3000);
+    esp_task_wdt_reset();
+    delay(3000);
+    esp_task_wdt_reset();
+
+    tubes.setVisibility(false);
+    tubes.clear();
+    tubes.show();
+    delay(1000);
+    setColonVis(false);
+    delay(1000);
+    tubes.setVisibility(true);
+    antiCathodePoisonRoutine(1000, true);
+    tubes.clear();
+    tubes.show();
+    delay(1000);
 }
 
 [[noreturn]] void normalTubeLoop(void * parameter) {
@@ -281,55 +420,19 @@ void antiCathodePoisonRoutine(int speed, bool reset) {
 
             tubes.showNUM();
 
-            if (minute % 5 == 0) {
+            if (minute % TEMP_INTERVAL == 0) {
                 showTime = false;
             }
 
             for (int i = 0; i < 30 - timeNow.tm_sec/2; i++) {
-                digitalWrite(COLON_1_PIN, LOW);
-                digitalWrite(COLON_2_PIN, LOW);
+                setColonVis(false);
                 delay(1000);
-                digitalWrite(COLON_1_PIN, HIGH);
-                digitalWrite(COLON_2_PIN, HIGH);
+                setColonVis(true);
                 delay(1000);
                 esp_task_wdt_reset();
             }
         }
-        digitalWrite(COLON_1_PIN, LOW);
-        digitalWrite(COLON_2_PIN, LOW);
-
-        antiCathodePoisonRoutine(1000, true); //TODO: Every five minutes is just a made up number. Research the best time spend doing this.
-        // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
-        //Show temp and date here
-        tubes.setVisibility(false);
-        struct tm timeNow;
-        getLocalTime(&timeNow);
-
-        int day = timeNow.tm_mday;
-        tubes.setNumber(0, day/10); //Int division -> remove the last digit
-        tubes.setNumber(1, day%10);
-
-        int month = timeNow.tm_mon + 1;
-        tubes.setNumber(2, month/10);
-        tubes.setNumber(3, month%10);
-        //Display something on SC Tubes?
-        tubes.showNUM();
-
-        delay(1000);
-        digitalWrite(COLON_1_PIN, HIGH);
-        digitalWrite(COLON_2_PIN, HIGH);
-        delay(1000);
-        tubes.setVisibility(true);
-
-        delay(3000);
-        esp_task_wdt_reset();
-        delay(3000);
-        esp_task_wdt_reset();
-
-        digitalWrite(COLON_1_PIN, LOW);
-        digitalWrite(COLON_2_PIN, LOW);
-
-        antiCathodePoisonRoutine(1000, true);
+        showDate();
     }
 }
 
@@ -387,14 +490,14 @@ void setup() {
     delay(100);
     Serial.println("Starting mDNS");
 
-    startmDNS();
+    //startmDNS();
 
     Serial.println("mDNS responder started");
     delay(100);
     Serial.println("Starting WebServer");
 
-    startServer();
-    server.begin();
+    //startServer();
+    //server.begin();
 
     configTime(3600, 3600, "pool.ntp.org");
     printLocalTime();
@@ -465,6 +568,14 @@ void loop() {
         tubes.setVisibilityNUM(true);
         delay(1000);
     }*/
+    Serial.println("Do weather");
+    showWeather();
+    Serial.println("Weather done");
+    for (int i = 0; i < 10; i++) {
+        delay(1000);
+        esp_task_wdt_reset();
+    }
+
 
     uint16_t adc_data = analogRead(HV_SENSE_PIN);
     double voltage = ((adc_data / 4095.0) * 3.3) / 2000.0 * 202000;

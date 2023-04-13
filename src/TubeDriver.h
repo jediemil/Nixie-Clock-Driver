@@ -29,6 +29,7 @@ public:
     void showSC();
     void show();
     void clear();
+    void clearNUMTo(int number);
     void setNumber(int tube, int number);
     void enableNumber(int tube, int number);
     void disableNumber(int tube, int number);

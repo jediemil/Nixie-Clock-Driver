@@ -28,6 +28,45 @@ void TubeDriver::disableNumber(int tube, int number) {
     numDataTable[tube] &= ~(0b1 << in14Tubes[tube]->lookup[number]) % 12;
 }
 
+void TubeDriver::clear() {
+    for (int i = 0; i < numIN14; i++) {
+        numDataTable[i] = 0x00;
+    }
+    for (int i = 0; i < numIN19; i++) {
+        scDataTable[i] = 0x00;
+    }
+}
+
+void TubeDriver::clearNUMTo(int number) {
+    for (int i = 0; i < numIN14; i++) {
+        setNumber(i, number);
+    }
+}
+
+
+void TubeDriver::setVisibility(bool visible) {
+    setVisibilityNUM(visible);
+    setVisibilitySC(visible);
+}
+
+void TubeDriver::setVisibilityNUM(bool visible) {
+    ShiftRegisterNUM->enable(visible);
+}
+
+void TubeDriver::setVisibilitySC(bool visible) {
+    ShiftRegisterSC->enable(visible);
+}
+
+
+void TubeDriver::show() {
+    showNUM();
+    showSC();
+}
+
+void TubeDriver::showSC() {
+
+}
+
 void TubeDriver::showNUM() {
     uint8_t shiftRegisterTable[6] = {0, 0, 0, 0, 0, 0};
     /*shiftRegisterTable[0] = numDataTable[0] & 0xff;
@@ -47,17 +86,4 @@ void TubeDriver::showNUM() {
     Serial.println("B");
 
     ShiftRegisterNUM->sendData(shiftRegisterTable, 6);
-}
-
-void TubeDriver::setVisibility(bool visible) {
-    setVisibilityNUM(visible);
-    setVisibilitySC(visible);
-}
-
-void TubeDriver::setVisibilityNUM(bool visible) {
-    ShiftRegisterNUM->enable(visible);
-}
-
-void TubeDriver::setVisibilitySC(bool visible) {
-    ShiftRegisterSC->enable(visible);
 }
