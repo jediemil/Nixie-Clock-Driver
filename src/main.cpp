@@ -392,8 +392,9 @@ void showWeather() {
         sign = '-';
     }
     tubes.setCharacter(4, sign);
-    tubes.setNumber(2, abs(temp) / 10);
-    tubes.setNumber(3, abs((int) temp) % 10);
+    tubes.setNumber(1, abs((int) temp * 100) / 100);
+    tubes.setNumber(2, (abs((int) temp * 100) / 10) % 10);
+    tubes.setNumber(3, abs((int) temp * 100) % 10);
     tubes.show();
 
     delay(3000);
