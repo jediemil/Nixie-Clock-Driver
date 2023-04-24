@@ -91,6 +91,10 @@ ShiftRegisterDriver ShiftRegisterNUM(26, 32, 33, 25);
 ShiftRegisterDriver ShiftRegisterSC(18, 17, 16, 4);
 TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 0);
 
+bool dayENTable[24] = {
+        false, false, false, false, false, false, false, true, true, true, false, false,
+        false, false, true, true, true, true, true, true, true, true, true, false
+};
 
 
 #endif //NIXIECLOCK_MAIN_H

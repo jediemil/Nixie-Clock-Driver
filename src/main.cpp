@@ -9,6 +9,8 @@ int humidity = 0;
 float pressure = 0;
 int wSymb2 = 0;
 
+bool tubesRunning = false;
+
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
@@ -267,44 +269,6 @@ void antiCathodePoisonRoutine(int speed, bool reset) {
     }
 }
 
-String getValue(HTTPClient &http, String key, int skip, int get) {
-    bool found = false, look = false;
-    int ind = 0;
-    String ret_str = "";
-
-    int len = http.getSize();
-    char char_buff[1];
-    WiFiClient * stream = http.getStreamPtr();
-    while (http.connected() && (len > 0 || len == -1)) {
-        size_t size = stream->available();
-        if (size) {
-            int c = stream->readBytes(char_buff, ((size > sizeof(char_buff)) ? sizeof(char_buff) : size));
-            if (len > 0)
-                len -= c;
-            if (found) {
-                if (skip == 0) {
-                    ret_str += char_buff[0];
-                    get --;
-                } else
-                    skip --;
-                if (get <= 0)
-                    break;
-            }
-            else if ((!look) && (char_buff[0] == key[0])) {
-                look = true;
-                ind = 1;
-            } else if (look && (char_buff[0] == key[ind])) {
-                ind ++;
-                if (ind == key.length()) found = true;
-            } else if (look && (char_buff[0] != key[ind])) {
-                ind = 0;
-                look = false;
-            }
-        }
-    }
-    return ret_str;
-}
-
 String serverName = "http://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/18.087880/lat/59.511650/data.json";
 
 void getWeather() {
@@ -386,21 +350,24 @@ void getWeather() {
 void showWeather() {
     // temp
 
-    tubes.setCharacter(5, 'c');
+    tubes.setCharacter(1, 'c');
     char sign = '+';
     if (temp < 0) {
         sign = '-';
     }
-    tubes.setCharacter(4, sign);
-    tubes.setNumber(1, abs((int) temp * 100) / 100);
-    tubes.setNumber(2, (abs((int) temp * 100) / 10) % 10);
-    tubes.setNumber(3, abs((int) temp * 100) % 10);
+    tubes.setCharacter(0, sign);
+    tubes.setNumber(0, abs((int) temp) / 10);
+    tubes.setNumber(1, abs((int) temp) % 10);
+    tubes.setNumber(2, abs((int) (temp * 10)) % 10);
+    tubes.setNumber(3, 0);
+    digitalWrite(COLON_1_PIN, HIGH);
     tubes.show();
 
     delay(3000);
     esp_task_wdt_reset();
     delay(3000);
 
+    setColonVis(false);
     antiCathodePoisonRoutine(1000, true);
 
 }
@@ -581,21 +548,12 @@ void setup() {
     delay(100);
     Serial.println("Configuring WDT and tube normal setup");
 
-    xTaskCreate(
-            normalTubeLoop,
-            "Tube Normal Task",
-            10000,
-            NULL,
-            1,
-            &normalTubeRunnerHandle            // Task handle
-    );
+    tubes.clear();
+    tubes.show();
     esp_task_wdt_init(8, true); //enable panic so ESP32 restarts, 8 seconds
     esp_task_wdt_add(NULL); //add current thread to WDT watch
-    esp_task_wdt_add(normalTubeRunnerHandle);
 
     Serial.println("WDT and tube started");
-
-    digitalWrite(PSU_EN_PIN, HIGH);
 }
 
 
@@ -614,6 +572,39 @@ void loop() {
         WiFi.reconnect();
     }
 
+    struct tm timeNow;
+    getLocalTime(&timeNow);
+
+    if (tubesRunning && !dayENTable[timeNow.tm_hour]) {
+        esp_task_wdt_delete(normalTubeRunnerHandle);
+        vTaskDelete(normalTubeRunnerHandle);
+        for (int i = 0; i < 20; i++) {
+            antiCathodePoisonRoutine(2000, true);
+        }
+        digitalWrite(PSU_EN_PIN, LOW);
+        tubes.clear();
+        tubes.show();
+        tubes.setVisibility(false);
+        tubesRunning = false;
+
+    } else if (!tubesRunning && dayENTable[timeNow.tm_hour]) {
+        digitalWrite(PSU_EN_PIN, HIGH);
+        tubes.setVisibility(true);
+        antiCathodePoisonRoutine(250, true);
+
+        xTaskCreate(
+                normalTubeLoop,
+                "Tube Normal Task",
+                10000,
+                NULL,
+                1,
+                &normalTubeRunnerHandle
+        );
+        esp_task_wdt_add(normalTubeRunnerHandle);
+
+        tubesRunning = true;
+    }
+
     //printLocalTime();
 
     /*for (uint8_t number = 0; number < 12; number++) {
@@ -628,6 +619,9 @@ void loop() {
         Serial.println("Do weather");
         getWeather();
         Serial.println("Weather done");
+        Serial.println("Re-sync time");
+        configTime(3600, 3600, "pool.ntp.org");
+        Serial.println("Time re-synced");
     }
 
 
