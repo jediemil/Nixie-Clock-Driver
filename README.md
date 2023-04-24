@@ -6,7 +6,16 @@ Making this I have also realised I suck at git, don't laugh at me for that too.
 
 Credits to https://github.com/smford/esp32-asyncwebserver-fileupload-example
 
-Used librarys:
+Used libraries:
+
 https://github.com/Makuna/NeoPixelBus
+
 https://github.com/me-no-dev/ESPAsyncWebServer
+
 https://github.com/me-no-dev/AsyncTCP
+
+https://github.com/squix78/json-streaming-parser
+
+https://github.com/PaulStoffregen/Time
+
+https://github.com/bblanchon/ArduinoJson

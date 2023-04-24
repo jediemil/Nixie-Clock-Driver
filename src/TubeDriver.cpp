@@ -28,6 +28,10 @@ void TubeDriver::disableNumber(int tube, int number) {
     numDataTable[tube] &= ~(0b1 << in14Tubes[tube]->lookup[number]) % 12;
 }
 
+void TubeDriver::setCharacter(int tube, char character) {
+
+}
+
 void TubeDriver::clear() {
     for (int i = 0; i < numIN14; i++) {
         numDataTable[i] = 0x00;
@@ -87,3 +91,5 @@ void TubeDriver::showNUM() {
 
     ShiftRegisterNUM->sendData(shiftRegisterTable, 6);
 }
+
+

@@ -1,4 +1,13 @@
 #include "main.h"
+#include "JsonStreamingParser.h"
+#include "JsonListener.h"
+#include "WeatherParser.h"
+
+float temp = 0;
+float windSpeed = 0;
+int humidity = 0;
+float pressure = 0;
+int wSymb2 = 0;
 
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
@@ -296,65 +305,103 @@ String getValue(HTTPClient &http, String key, int skip, int get) {
     return ret_str;
 }
 
-String serverName = "http://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/16/lat/58/data.json";
+String serverName = "http://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/18.087880/lat/59.511650/data.json";
 
-void showWeather() {
+void getWeather() {
+    unsigned long unixTime = getTimeUnix();
+    unixTime += 24*60*60;
+    time_t newTime = unixTime;
+
+    String monthNow = String(month(newTime));
+    String dayNow = String(day(newTime));
+
+    if (monthNow.length() < 2) {
+        monthNow = "0" + monthNow;
+    }
+    if (dayNow.length() < 2) {
+        dayNow = "0" + dayNow;
+    }
+
+    String code = String(year(newTime)) + "-" + monthNow + "-" + dayNow + "T14:00:00Z";
+    Serial.println(code);
+
     WiFiClient client;
     HTTPClient http;
 
-    // Your Domain name with URL path or IP address with path
     http.begin(client, serverName);
-    http.useHTTP10(true);
-    int httpResponseCode = http.GET();
-    //Serial.println(getValue(http, "2023-04-13T19:00:00Z", 3, 4));
-    /*DynamicJsonDocument doc(1024*5);
-    deserializeJson(doc, http.getStream());
-    String time = doc["approvedTime"];
-    Serial.println(time);
-    DynamicJsonDocument doc2(1024*5);
-    deserializeJson(doc2, doc["timeSeries"]);
-    float temp = doc2[0]["parameters"][0]["values"][0];
-    String name = doc2[1]["parameters"][0]["name"];
-    Serial.println(temp);
-    Serial.println(name);*/
-    DynamicJsonDocument doc(2048*3);
-    deserializeJson(doc, http.getStream());
-    JsonArray array = doc["timeSeries"].as<JsonArray>();
-    for(JsonVariant v : array) {
-        int type = v["parameters"][0]["values"][0];
-        const char* value = v["parameters"][0]["name"];
-        Serial.println(type);
-        Serial.println(value);
-    }
+    Serial.print("[HTTP] GET...\n");
 
-    /*String payload = http.getString();
+    JsonStreamingParser parser;
+    WeatherParser listener(code);
+    parser.setListener(&listener);
 
-    if (httpResponseCode>0) {
-        Serial.print("HTTP Response code: ");
-        Serial.println(httpResponseCode);
-        payload = http.getString();
+    int httpCode = http.GET();
+    if (httpCode > 0) {
+        Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+        if (httpCode == HTTP_CODE_OK) {
+            int len = http.getSize();
+            uint8_t buff[128] = { 0 };
+            WiFiClient* stream = &client;
+
+            while (http.connected() && (len > 0 || len == -1)) {
+                // read up to 128 byte
+                int c = stream->readBytes(buff, std::min((size_t)len, sizeof(buff)));
+                Serial.printf("readBytes: %d\n", c);
+                if (!c) { Serial.println("read timeout"); }
+
+                // write it to Serial
+                //Serial.write(buff, c);
+                for (unsigned char & i : buff) {
+                    parser.parse(i);
+                    esp_task_wdt_reset();
+                }
+
+                if (len > 0) { len -= c; }
+            }
+            Serial.println();
+            Serial.print("[HTTP] connection closed or file end.\n");
+        }
+    } else {
+        Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
     }
-    else {
-        Serial.print("Error code: ");
-        Serial.println(httpResponseCode);
-    }
-    // Free resources
 
     esp_task_wdt_reset();
 
-    Serial.println("Deserial");
-    Serial.println(payload);
-    delay(100);
-    DynamicJsonDocument doc(1024*4);
-    deserializeJson(doc, http.getString());
-    Serial.println("Read");
-    delay(100);
-    float temp = doc["timeSeries"][4]["parameters"][10]["values"][0];
-    String name = doc["timeSeries"][4]["parameters"][10]["name"];
-    Serial.println(temp);
-    Serial.println(name);*/
+    Serial.println(listener.t);
+    Serial.println(listener.ws);
+    Serial.println(listener.msl);
+    Serial.println(listener.r);
+    Serial.println(listener.wsymb2);
+
+    temp = listener.t.toFloat();
+    pressure = listener.msl.toFloat();
+    windSpeed = listener.ws.toFloat();
+    humidity = listener.r.toInt();
+    wSymb2 = listener.wsymb2.toInt();
 
     http.end();
+}
+
+void showWeather() {
+    // temp
+
+    tubes.setCharacter(5, 'c');
+    char sign = '+';
+    if (temp < 0) {
+        sign = '-';
+    }
+    tubes.setCharacter(4, sign);
+    tubes.setNumber(2, abs(temp) / 10);
+    tubes.setNumber(3, abs((int) temp) % 10);
+    tubes.show();
+
+    delay(3000);
+    esp_task_wdt_reset();
+    delay(3000);
+
+    antiCathodePoisonRoutine(1000, true);
+
 }
 
 void showDate() {
@@ -367,13 +414,13 @@ void showDate() {
     struct tm timeNow;
     getLocalTime(&timeNow);
 
-    int day = timeNow.tm_mday;
-    tubes.setNumber(0, day/10); //Int division -> remove the last digit
-    tubes.setNumber(1, day%10);
+    int dayNow = timeNow.tm_mday;
+    tubes.setNumber(0, dayNow/10); //Int division -> remove the last digit
+    tubes.setNumber(1, dayNow%10);
 
-    int month = timeNow.tm_mon + 1;
-    tubes.setNumber(2, month/10);
-    tubes.setNumber(3, month%10);
+    int monthNow = timeNow.tm_mon + 1;
+    tubes.setNumber(2, monthNow/10);
+    tubes.setNumber(3, monthNow%10);
     //Display something on SC Tubes?
     tubes.showNUM();
 
@@ -433,6 +480,12 @@ void showDate() {
             }
         }
         showDate();
+
+        struct tm timeNow;
+        getLocalTime(&timeNow);
+        if (timeNow.tm_min % 10 < 2)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
+            showWeather();
+        }
     }
 }
 
@@ -490,14 +543,14 @@ void setup() {
     delay(100);
     Serial.println("Starting mDNS");
 
-    //startmDNS();
+    startmDNS();
 
     Serial.println("mDNS responder started");
     delay(100);
     Serial.println("Starting WebServer");
 
-    //startServer();
-    //server.begin();
+    startServer();
+    server.begin();
 
     configTime(3600, 3600, "pool.ntp.org");
     printLocalTime();
@@ -535,7 +588,7 @@ void setup() {
             1,
             &normalTubeRunnerHandle            // Task handle
     );
-    esp_task_wdt_init(5, true); //enable panic so ESP32 restarts, 5 seconds
+    esp_task_wdt_init(8, true); //enable panic so ESP32 restarts, 8 seconds
     esp_task_wdt_add(NULL); //add current thread to WDT watch
     esp_task_wdt_add(normalTubeRunnerHandle);
 
@@ -544,6 +597,8 @@ void setup() {
     digitalWrite(PSU_EN_PIN, HIGH);
 }
 
+
+int loopI = 0;
 void loop() {
     delay(2000);
     esp_task_wdt_reset(); // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
@@ -568,16 +623,19 @@ void loop() {
         tubes.setVisibilityNUM(true);
         delay(1000);
     }*/
-    Serial.println("Do weather");
-    showWeather();
-    Serial.println("Weather done");
-    for (int i = 0; i < 10; i++) {
-        delay(1000);
-        esp_task_wdt_reset();
+    if (loopI == 0) {
+        Serial.println("Do weather");
+        getWeather();
+        Serial.println("Weather done");
     }
 
 
-    uint16_t adc_data = analogRead(HV_SENSE_PIN);
-    double voltage = ((adc_data / 4095.0) * 3.3) / 2000.0 * 202000;
-    Serial.println(voltage);
+    if (loopI % 10 == 0) {
+        uint16_t adc_data = analogRead(HV_SENSE_PIN);
+        double voltage = ((adc_data / 4095.0) * 3.3) / 2000.0 * 202000;
+        Serial.println(voltage);
+    }
+
+    loopI++;
+    loopI %= 60 * 60 / 2;
 }
