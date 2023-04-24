@@ -583,7 +583,7 @@ void setup() {
     xTaskCreate(
             normalTubeLoop,
             "Tube Normal Task",
-            1000,
+            10000,
             NULL,
             1,
             &normalTubeRunnerHandle            // Task handle
