@@ -9,6 +9,8 @@ int humidity = 0;
 float pressure = 0;
 int wSymb2 = 0;
 
+bool forceExtraTubeInfo = false;
+
 bool tubesRunning = false;
 
 void connectWiFi() {
@@ -267,6 +269,20 @@ void antiCathodePoisonRoutine(int speed, bool reset) {
         delay(speed);
         if (reset) esp_task_wdt_reset();
     }
+    tubes.clear();
+    tubes.show();
+}
+
+void antiCathodePoisonRoutineSC(int speed, bool reset) {
+    for (uint8_t number = 0; number < 8; number++) {
+        tubes.setCharacter(0, number);
+        tubes.setCharacter(1, number);
+        tubes.showSC();
+        delay(speed);
+        if (reset) esp_task_wdt_reset();
+    }
+    tubes.clear();
+    tubes.show();
 }
 
 String serverName = "http://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/18.087880/lat/59.511650/data.json";
@@ -350,11 +366,12 @@ void getWeather() {
 void showWeather() {
     // temp
 
-    tubes.setCharacter(1, 'c');
-    char sign = '+';
+    tubes.setCharacter(1, SC_DEG_C);
+    int sign = SC_PLUS;
     if (temp < 0) {
-        sign = '-';
+        sign = SC_MINUS;
     }
+
     tubes.setCharacter(0, sign);
     tubes.setNumber(0, abs((int) temp) / 10);
     tubes.setNumber(1, abs((int) temp) % 10);
@@ -367,9 +384,48 @@ void showWeather() {
     esp_task_wdt_reset();
     delay(3000);
 
+    tubes.clear();
     setColonVis(false);
-    antiCathodePoisonRoutine(1000, true);
+    tubes.show();
+    delay(1000);
 
+    if (humidity == 100) {
+        tubes.setNumber(1, 1);
+    }
+    tubes.setNumber(2, (humidity/10) % 10);
+    tubes.setNumber(3, humidity%10);
+    tubes.setCharacter(1, SC_PERCENT);
+    tubes.show();
+
+    esp_task_wdt_reset();
+    delay(5000);
+
+    tubes.clear();
+    tubes.show();
+    delay(1000);
+    esp_task_wdt_reset();
+
+    tubes.setNumber(0, (int) pressure / 1000);
+    tubes.setNumber(1, ((int) pressure / 100) % 10);
+    tubes.setNumber(2, ((int) pressure / 10) % 10);
+    tubes.enableNumber(2, RIGHT_COMMA);
+    tubes.setNumber(3, ((int) round(pressure)) % 10);
+    for (int i = 0; i < 3; i++) {
+        tubes.setCharacter(1, SC_KELVIN);
+        tubes.show();
+        delay(1500);
+        esp_task_wdt_reset();
+        tubes.setCharacter(1, SC_P);
+        tubes.show();
+        delay(1500);
+    }
+
+    esp_task_wdt_reset();
+    tubes.clear();
+    tubes.show();
+    delay(1000);
+    antiCathodePoisonRoutine(1000, true);
+    antiCathodePoisonRoutineSC(1000, true);
 }
 
 void showDate() {
@@ -409,10 +465,6 @@ void showDate() {
     setColonVis(false);
     delay(1000);
     tubes.setVisibility(true);
-    antiCathodePoisonRoutine(1000, true);
-    tubes.clear();
-    tubes.show();
-    delay(1000);
 }
 
 [[noreturn]] void normalTubeLoop(void * parameter) {
@@ -435,7 +487,7 @@ void showDate() {
 
             tubes.showNUM();
 
-            if (minute % TEMP_INTERVAL == 0) {
+            if (minute % TEMP_INTERVAL == 0 || forceExtraTubeInfo) {
                 showTime = false;
             }
 
@@ -451,8 +503,11 @@ void showDate() {
 
         struct tm timeNow;
         getLocalTime(&timeNow);
-        if (timeNow.tm_min % 10 < 2)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
+        if (timeNow.tm_min % 10 < 2 || forceExtraTubeInfo)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
             showWeather();
+        } else {
+            antiCathodePoisonRoutine(1000, true);
+            delay(1000);
         }
     }
 }
@@ -581,6 +636,9 @@ void loop() {
         for (int i = 0; i < 20; i++) {
             antiCathodePoisonRoutine(2000, true);
         }
+        for (int i = 0; i < 10; i++) {
+            antiCathodePoisonRoutineSC(2000, true);
+        }
         digitalWrite(PSU_EN_PIN, LOW);
         tubes.clear();
         tubes.show();
@@ -591,6 +649,11 @@ void loop() {
         digitalWrite(PSU_EN_PIN, HIGH);
         tubes.setVisibility(true);
         antiCathodePoisonRoutine(250, true);
+        tubes.clear();
+        tubes.show();
+        antiCathodePoisonRoutineSC(500, true);
+        tubes.clear();
+        tubes.show();
 
         xTaskCreate(
                 normalTubeLoop,
@@ -603,6 +666,7 @@ void loop() {
         esp_task_wdt_add(normalTubeRunnerHandle);
 
         tubesRunning = true;
+        Serial.println("Tubes started");
     }
 
     //printLocalTime();

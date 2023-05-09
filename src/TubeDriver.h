@@ -21,7 +21,7 @@ private:
     uint8_t numIN19;
 
     uint16_t numDataTable[4] = {0, 0, 0, 0};
-    uint16_t scDataTable[2] = {0, 0};
+    uint8_t scDataTable[2] = {0, 0};
 
 public:
     TubeDriver(ShiftRegisterDriver* numRegisters, IN14Tube** tubesNUM, uint8_t numNUMTubes, ShiftRegisterDriver* scRegisters, IN19Tube** tubesSC, uint8_t numSCTubes);
@@ -34,6 +34,7 @@ public:
     void enableNumber(int tube, int number);
     void disableNumber(int tube, int number);
     void setCharacter(int tube, char character);
+    void setCharacter(int tube, int character);
     void setVisibility(bool visible);
     void setVisibilityNUM(bool visible);
     void setVisibilitySC(bool visible);

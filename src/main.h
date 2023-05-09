@@ -42,6 +42,25 @@ TaskHandle_t normalTubeRunnerHandle;
 #define LEFT_COMMA 10
 #define RIGHT_COMMA 11
 
+#define SC_PERCENT 0
+#define SC_M 1
+#define SC_P 2
+#define SC_m 3
+#define SC_DEG_C 4
+#define SC_MY 5
+#define SC_n 6
+#define SC_KELVIN 7
+
+#define SC_MINUS 8
+#define SC_GT 9
+#define SC_PLUS 10
+#define SC_dB 11
+#define SC_LT 12
+#define SC_SINE 13
+#define SC_DIVISION 14
+#define SC_PI 15
+
+
 #define TEMP_INTERVAL 5
 
 AsyncWebServer server(80);
@@ -89,7 +108,7 @@ static IN14Tube* tubeTable[] = {tube1, tube2, tube3, tube4};
 
 ShiftRegisterDriver ShiftRegisterNUM(26, 32, 33, 25);
 ShiftRegisterDriver ShiftRegisterSC(18, 17, 16, 4);
-TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 0);
+TubeDriver tubes(&ShiftRegisterNUM, tubeTable, 4, &ShiftRegisterSC, {}, 2);
 
 bool dayENTable[24] = {
         false, false, false, false, false, false, false, true, true, true, false, false,

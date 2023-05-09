@@ -29,7 +29,10 @@ void TubeDriver::disableNumber(int tube, int number) {
 }
 
 void TubeDriver::setCharacter(int tube, char character) {
+}
 
+void TubeDriver::setCharacter(int tube, int character) {
+    scDataTable[tube] = 0b1 << (character % 8);
 }
 
 void TubeDriver::clear() {
@@ -68,7 +71,10 @@ void TubeDriver::show() {
 }
 
 void TubeDriver::showSC() {
-
+    uint8_t shiftRegisterTable[2] = {0, 0};
+    shiftRegisterTable[0] = scDataTable[1];
+    shiftRegisterTable[1] = scDataTable[0];
+    ShiftRegisterSC->sendData(shiftRegisterTable, 2);
 }
 
 void TubeDriver::showNUM() {
