@@ -12,6 +12,11 @@ int wSymb2 = 0;
 bool forceExtraTubeInfo = false;
 
 bool tubesRunning = false;
+bool manualTubes = false;
+
+extern void antiCathodePoisonRoutine(int speed, bool reset);
+extern void antiCathodePoisonRoutineSC(int speed, bool reset);
+extern void setColonVis(bool visibility);
 
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
@@ -197,6 +202,76 @@ void startServer() {
                   handleDoUpdate(request, filename, index, data, len, final);
               });
     Update.onProgress(printProgress);
+
+    server.on("/cathode_pois", HTTP_POST,[](AsyncWebServerRequest *request) {
+        AsyncResponseStream *response = request->beginResponseStream("text/plain");
+        response->addHeader("Access-Control-Allow-Origin","*");
+        response->addHeader("Access-Control-Allow-Headers", "Content-Type, data");
+        response->addHeader("Access-Control-Allow-Methods", "POST, GET");
+        response->setCode(200);
+        request->send(response);
+
+        esp_task_wdt_reset();
+
+        bool use0 = false;
+        bool use1 = false;
+        bool use2 = false;
+        bool use3 = false;
+
+        if (request->hasHeader("tube0")) {
+            use0 = true;
+        }
+        if (request->hasHeader("tube1")) {
+            use1 = true;
+        }
+        if (request->hasHeader("tube2")) {
+            use2 = true;
+        }
+        if (request->hasHeader("tube3")) {
+            use3 = true;
+        }
+
+        if (use0 || use1 || use2 || use3) {
+
+            manualTubes = true;
+            delay(1000);
+
+            if (tubesRunning) {
+                esp_task_wdt_delete(normalTubeRunnerHandle);
+                vTaskDelete(normalTubeRunnerHandle);
+            }
+
+            tubes.clear();
+            tubes.setVisibility(true);
+            tubes.show();
+            setColonVis(false);
+            delay(1000);
+
+            esp_task_wdt_reset();
+
+            digitalWrite(PSU_EN_PIN, HIGH);
+            for (int i = 0; i < 60; i++) {
+                for (int j = 0; j < 12; j++) {
+                    if (use0) tubes.setNumber(0, j);
+                    if (use1) tubes.setNumber(1, j);
+                    if (use2) tubes.setNumber(2, j);
+                    if (use3) tubes.setNumber(3, j);
+
+                    tubes.showNUM();
+                    delay(5000);
+                    esp_task_wdt_reset();
+                }
+                //antiCathodePoisonRoutine(5000, true);
+            }
+            digitalWrite(PSU_EN_PIN, LOW);
+            tubes.clear();
+            tubes.show();
+
+            delay(1000);
+
+            ESP.restart();
+        }
+    });
 
     server.on("/reset", HTTP_POST,[](AsyncWebServerRequest *request) {
         AsyncResponseStream *response = request->beginResponseStream("text/plain");
@@ -630,43 +705,46 @@ void loop() {
     struct tm timeNow;
     getLocalTime(&timeNow);
 
-    if (tubesRunning && !dayENTable[timeNow.tm_hour]) {
-        esp_task_wdt_delete(normalTubeRunnerHandle);
-        vTaskDelete(normalTubeRunnerHandle);
-        for (int i = 0; i < 20; i++) {
-            antiCathodePoisonRoutine(2000, true);
+    if (!manualTubes) {
+        if (tubesRunning && !dayENTable[timeNow.tm_hour]) {
+            esp_task_wdt_delete(normalTubeRunnerHandle);
+            vTaskDelete(normalTubeRunnerHandle);
+            for (int i = 0; i < 20; i++) {
+                antiCathodePoisonRoutine(2000, true);
+            }
+            for (int i = 0; i < 10; i++) {
+                antiCathodePoisonRoutineSC(2000, true);
+            }
+            if (!manualTubes) {
+                digitalWrite(PSU_EN_PIN, LOW);
+                tubes.clear();
+                tubes.show();
+                tubes.setVisibility(false);
+            }
+            tubesRunning = false;
+        } else if (!tubesRunning && dayENTable[timeNow.tm_hour]) {
+            digitalWrite(PSU_EN_PIN, HIGH);
+            tubes.setVisibility(true);
+            antiCathodePoisonRoutine(250, true);
+            tubes.clear();
+            tubes.show();
+            antiCathodePoisonRoutineSC(500, true);
+            tubes.clear();
+            tubes.show();
+
+            xTaskCreate(
+                    normalTubeLoop,
+                    "Tube Normal Task",
+                    10000,
+                    NULL,
+                    1,
+                    &normalTubeRunnerHandle
+            );
+            esp_task_wdt_add(normalTubeRunnerHandle);
+
+            tubesRunning = true;
+            Serial.println("Tubes started");
         }
-        for (int i = 0; i < 10; i++) {
-            antiCathodePoisonRoutineSC(2000, true);
-        }
-        digitalWrite(PSU_EN_PIN, LOW);
-        tubes.clear();
-        tubes.show();
-        tubes.setVisibility(false);
-        tubesRunning = false;
-
-    } else if (!tubesRunning && dayENTable[timeNow.tm_hour]) {
-        digitalWrite(PSU_EN_PIN, HIGH);
-        tubes.setVisibility(true);
-        antiCathodePoisonRoutine(250, true);
-        tubes.clear();
-        tubes.show();
-        antiCathodePoisonRoutineSC(500, true);
-        tubes.clear();
-        tubes.show();
-
-        xTaskCreate(
-                normalTubeLoop,
-                "Tube Normal Task",
-                10000,
-                NULL,
-                1,
-                &normalTubeRunnerHandle
-        );
-        esp_task_wdt_add(normalTubeRunnerHandle);
-
-        tubesRunning = true;
-        Serial.println("Tubes started");
     }
 
     //printLocalTime();

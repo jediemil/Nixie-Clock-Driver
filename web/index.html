@@ -5,8 +5,20 @@
     <title>Nixie Klocka</title>
 </head>
 <body>
-<h1>Hej. Det här fungerar</h1>
-<p>(:</p>
-<a href="/file">Filuppladdning</a>
+    <h1>Hej. Det här fungerar</h1>
+    <p>(:</p>
+    <a href="/file">Filuppladdning</a>
+    <br>
+    <input type="checkbox" id="tube0">
+    <label for="tube0"> Tub 0</label><br>
+    <input type="checkbox" id="tube1">
+    <label for="tube1"> Tub 1</label><br>
+    <input type="checkbox" id="tube2">
+    <label for="tube2"> Tub 2</label><br>
+    <input type="checkbox" id="tube3">
+    <label for="tube3"> Tub 3</label><br><br>
+    <button id="CatPoisButton" onclick="sendCatCommand()">Rensa katoder</button>
+
+<script src="js/cathode.js"></script>
 </body>
 </html>
