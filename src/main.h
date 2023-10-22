@@ -115,5 +115,10 @@ bool dayENTable[24] = {
         false, false, true, true, true, true, true, true, true, true, true, false
 };
 
+bool animENTable[24] = {
+        false, false, false, false, false, false, false, false, false, true, true, true,
+        true, true, true, true, true, true, true, true, true, true, true, true
+};
+
 
 #endif //NIXIECLOCK_MAIN_H

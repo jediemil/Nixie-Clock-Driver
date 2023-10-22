@@ -18,12 +18,23 @@ extern void antiCathodePoisonRoutine(int speed, bool reset);
 extern void antiCathodePoisonRoutineSC(int speed, bool reset);
 extern void setColonVis(bool visibility);
 
+void rgbClearTo(Rgb48Color col) { //NeoPixelBus ClearTo with Rgb48Color is not working
+    for (int i = 0; i < NUM_LEDS; i++) {
+        RGBStrip.SetPixelColor(i, col);
+    }
+}
+
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     Serial.print("Connecting to WiFi ..");
     while (WiFi.status() != WL_CONNECTED) {
         Serial.print('.');
+        rgbClearTo(Rgb48Color(255, 0, 0));
+        RGBStrip.Show();
+        delay(1000);
+        rgbClearTo(Rgb48Color(255, 100, 0));
+        RGBStrip.Show();
         delay(1000);
     }
     Serial.println(WiFi.localIP());
@@ -587,6 +598,102 @@ void showDate() {
     }
 }
 
+[[noreturn]] void clockOffLoop(void * args) {
+    int lastColor = random(0, 5);
+    while (true) {
+        struct tm timeNow;
+        getLocalTime(&timeNow);
+
+        if (animENTable[timeNow.tm_hour]) {
+            int color = random(0, 5);
+            uint32_t steps = random(255, 1000);
+            double step = 1.0 / steps;
+
+            for (int i = 0; i < steps; i++) {
+                uint16_t lastColorValue = 100.0 - (i * step * 100);
+                uint16_t newColorValue = i * step * 100;
+
+                uint16_t r = lastColorValue * (lastColor == 0) + newColorValue * (color == 0);
+                uint16_t g = lastColorValue * (lastColor == 1) + newColorValue * (color == 1);
+                uint16_t b = lastColorValue * (lastColor == 2) + newColorValue * (color == 2);
+                uint16_t ww = lastColorValue * (lastColor == 3) + newColorValue * (color == 3);
+                uint16_t nw = lastColorValue * (lastColor == 4) + newColorValue * (color == 4);
+                uint16_t cw = lastColorValue * (lastColor == 5) + newColorValue * (color == 5);
+
+                rgbClearTo(Rgb48Color(r, g, b));
+                //RGBStrip.SetPixelColor(0, Rgb48Color(r, g, b));
+                //RGBStrip.SetPixelColor(1, Rgb48Color(0, 255, 0));
+                //RGBStrip.SetPixelColor(2, Rgb48Color(0, 0, 255));
+                whiteStrip.ClearTo(RgbColor(ww, nw, cw));
+                RGBStrip.Show();
+                whiteStrip.Show();
+                delay(1000);
+                esp_task_wdt_reset();
+            }
+            lastColor = color;
+
+        } else {
+            rgbClearTo(RgbColor(0, 0, 0));
+            whiteStrip.ClearTo(RgbColor(0, 0, 0));
+            RGBStrip.Show();
+            whiteStrip.Show();
+            for (int i = 0; i < 100; i++) {
+                esp_task_wdt_reset();
+                delay(5000);
+            }
+        }
+    }
+}
+
+void startTubes() {
+    whiteStrip.ClearTo(RgbColor(0, 0, 0));
+    whiteStrip.Show();
+    RGBStrip.ClearTo(RgbColor(0, 0, 0));
+    RGBStrip.Show();
+
+    digitalWrite(PSU_EN_PIN, HIGH);
+    tubes.setVisibility(true);
+    antiCathodePoisonRoutine(250, true);
+    tubes.clear();
+    tubes.show();
+    antiCathodePoisonRoutineSC(500, true);
+    tubes.clear();
+    tubes.show();
+
+    xTaskCreate(
+            normalTubeLoop,
+            "Tube Normal Task",
+            10000,
+            NULL,
+            1,
+            &normalTubeRunnerHandle
+    );
+    esp_task_wdt_add(normalTubeRunnerHandle);
+
+    tubesRunning = true;
+    Serial.println("Tubes started");
+}
+
+void shutDownTubes() {
+    if (!manualTubes) {
+        digitalWrite(PSU_EN_PIN, LOW);
+        tubes.clear();
+        tubes.show();
+        tubes.setVisibility(false);
+
+        xTaskCreate(
+                clockOffLoop,
+                "Tube Normal Task",
+                10000,
+                NULL,
+                1,
+                &normalTubeRunnerHandle
+        );
+        esp_task_wdt_add(normalTubeRunnerHandle);
+    }
+    tubesRunning = false;
+}
+
 void setup() {
     Serial.begin(115200);
 
@@ -608,7 +715,9 @@ void setup() {
 
     Serial.println("Starting LEDs");
     whiteStrip.Begin();
-    whiteStrip.ClearTo(RgbColor(20, 0, 0));
+    whiteStrip.SetPixelColor(3, RgbColor(25, 0, 0));
+    whiteStrip.SetPixelColor(4, RgbColor(0, 25, 0));
+    whiteStrip.SetPixelColor(5, RgbColor(0, 0, 25));
     whiteStrip.Show();
 
     RGBStrip.Begin();
@@ -684,6 +793,15 @@ void setup() {
     esp_task_wdt_add(NULL); //add current thread to WDT watch
 
     Serial.println("WDT and tube started");
+
+    struct tm timeNow;
+    getLocalTime(&timeNow);
+
+    if (dayENTable[timeNow.tm_hour]) {
+        startTubes();
+    } else {
+        shutDownTubes();
+    }
 }
 
 
@@ -709,41 +827,21 @@ void loop() {
         if (tubesRunning && !dayENTable[timeNow.tm_hour]) {
             esp_task_wdt_delete(normalTubeRunnerHandle);
             vTaskDelete(normalTubeRunnerHandle);
+
             for (int i = 0; i < 20; i++) {
                 antiCathodePoisonRoutine(2000, true);
             }
             for (int i = 0; i < 10; i++) {
                 antiCathodePoisonRoutineSC(2000, true);
             }
-            if (!manualTubes) {
-                digitalWrite(PSU_EN_PIN, LOW);
-                tubes.clear();
-                tubes.show();
-                tubes.setVisibility(false);
-            }
-            tubesRunning = false;
+
+            shutDownTubes();
+
         } else if (!tubesRunning && dayENTable[timeNow.tm_hour]) {
-            digitalWrite(PSU_EN_PIN, HIGH);
-            tubes.setVisibility(true);
-            antiCathodePoisonRoutine(250, true);
-            tubes.clear();
-            tubes.show();
-            antiCathodePoisonRoutineSC(500, true);
-            tubes.clear();
-            tubes.show();
+            esp_task_wdt_delete(normalTubeRunnerHandle);
+            vTaskDelete(normalTubeRunnerHandle);
 
-            xTaskCreate(
-                    normalTubeLoop,
-                    "Tube Normal Task",
-                    10000,
-                    NULL,
-                    1,
-                    &normalTubeRunnerHandle
-            );
-            esp_task_wdt_add(normalTubeRunnerHandle);
-
-            tubesRunning = true;
-            Serial.println("Tubes started");
+            startTubes();
         }
     }
 
