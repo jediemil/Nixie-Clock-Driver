@@ -44,7 +44,7 @@ void ShiftRegisterDriver::sendData(uint8_t *data, int len) {
             delayMicroseconds(freqDelay4);
         }
     }
-    Serial.println();
+    //Serial.println();
 
     delayMicroseconds(freqDelay4);
     digitalWrite(latchPin, LOW);

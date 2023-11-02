@@ -87,13 +87,13 @@ void TubeDriver::showNUM() {
     shiftRegisterTable[5] = (numDataTable[3] >> 4) & 0xff;*/
     for (int i = 3; i >= 0; i--) {
         for (int8_t aBit = 11; aBit >= 0; aBit--) {
-            Serial.write(bitRead(numDataTable[i], aBit) ? '1' : '0');
+            //Serial.write(bitRead(numDataTable[i], aBit) ? '1' : '0');
             int index = (i*12 + aBit) / 8;
             int shift = (i*12 + aBit) % 8;
             shiftRegisterTable[index] |= bitRead(numDataTable[3-i], aBit) << shift;
         }
     }
-    Serial.println("B");
+    //Serial.println("B");
 
     ShiftRegisterNUM->sendData(shiftRegisterTable, 6);
 }

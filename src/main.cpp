@@ -438,7 +438,7 @@ void showWeather() {
     tubes.setNumber(1, abs((int) temp) % 10);
     tubes.setNumber(2, abs((int) (temp * 10)) % 10);
     tubes.setNumber(3, 0);
-    digitalWrite(COLON_1_PIN, HIGH);
+    setColonVis(true, false);
     tubes.show();
 
     delay(3000);
