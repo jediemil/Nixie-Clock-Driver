@@ -75,9 +75,8 @@ void ServerRunner::startServer() {
         response->addHeader("Access-Control-Allow-Headers", "Content-Type, data");
         response->addHeader("Access-Control-Allow-Methods", "POST, GET");
         response->setCode(200);
+        response->write("Episkt");
         request->send(response);
-        request->redirect("/");
-
 
         delay(500);
 
