@@ -269,16 +269,16 @@ void setup() {
 
     Serial.println("Starting LEDs");
     whiteStrip.Begin();
-    whiteStrip.SetPixelColor(3, RgbColor(25, 0, 0));
-    whiteStrip.SetPixelColor(4, RgbColor(0, 25, 0));
-    whiteStrip.SetPixelColor(5, RgbColor(0, 0, 25));
+    whiteStrip.SetPixelColor(3, RgbColor(40, 0, 0));
+    whiteStrip.SetPixelColor(4, RgbColor(0, 40, 0));
+    whiteStrip.SetPixelColor(5, RgbColor(0, 0, 40));
     whiteStrip.Show();
 
     RGBStrip.Begin();
     //RGBStrip.ClearTo(Rgb48Color(40 << 8, 0, 50 << 8)); // Stupid ClearTo function does not work for 16-bit and I wasted 1 hour of my life.
-    RGBStrip.SetPixelColor(0, Rgb48Color(255, 0, 0));
-    RGBStrip.SetPixelColor(1, Rgb48Color(0, 255, 0));
-    RGBStrip.SetPixelColor(2, Rgb48Color(0, 0, 255));
+    RGBStrip.SetPixelColor(0, Rgb48Color(40 << 8, 0, 0));
+    RGBStrip.SetPixelColor(1, Rgb48Color(0, 40 << 8, 0));
+    RGBStrip.SetPixelColor(2, Rgb48Color(0, 0, 40 << 8));
     RGBStrip.Show();
 
     Serial.println("LEDs started");
