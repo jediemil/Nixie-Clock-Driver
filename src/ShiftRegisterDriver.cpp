@@ -35,7 +35,7 @@ void ShiftRegisterDriver::sendData(uint8_t *data, int len) {
     for (int i = len-1; i >= 0; i--) {
         for (int bit = 7; bit >= 0; bit--) {
             digitalWrite(dataPin, !((data[i] >> bit) & 0b1));
-            Serial.print(((data[i] >> bit) & 0b1));
+            //Serial.print(((data[i] >> bit) & 0b1));
             delayMicroseconds(freqDelay4);
             digitalWrite(clockPin, LOW);
             delayMicroseconds(freqDelay4);
