@@ -16,6 +16,4 @@ https://github.com/me-no-dev/AsyncTCP
 
 https://github.com/squix78/json-streaming-parser
 
-https://github.com/PaulStoffregen/Time
-
-https://github.com/bblanchon/ArduinoJson
+https://github.com/ropg/ezTime
