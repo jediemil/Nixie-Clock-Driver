@@ -124,20 +124,22 @@ void addTubeAPI() {
                 showTime = false;
             }
 
-            /*for (int i = 0; i < 30 - timeNow.tm_sec/2; i++) {
-                setColonVis(false);
-                delay(1000);
-                setColonVis(true);
-                delay(1000);
-                esp_task_wdt_reset();
-            }*/
-            while (!minuteChanged()) {
+            uint8_t goal = 30 - second(TIME_NOW)/2 + 1;
+            for (int i = 0; i < goal; i++) {
                 tubeAnim.setColonVis(false);
                 delay(1000);
                 tubeAnim.setColonVis(true);
                 delay(1000);
                 esp_task_wdt_reset();
             }
+            if (second(TIME_NOW) > 58) delay(2000); //In case of syncing error
+            /*while (!minuteChanged()) { //Should work, but sometimes froze and looped too long or endlessly.
+                tubeAnim.setColonVis(false);
+                delay(1000);
+                tubeAnim.setColonVis(true);
+                delay(1000);
+                esp_task_wdt_reset();
+            }*/
         }
         tubeAnim.showDate();
 
@@ -161,20 +163,20 @@ void addTubeAPI() {
         if (animENTable[hour(TIME_NOW)]) {
             int color = random(0, 5);
             uint32_t steps = random(255, 1000);
-            double step = 1.0 / steps;
+            double step = 200.0 / steps;
 
             for (int i = 0; i < steps; i++) {
-                uint16_t lastColorValue = 100.0 - (i * step * 100);
-                uint16_t newColorValue = i * step * 100;
+                uint16_t lastColorValue = 200.0 - (i * step);
+                uint16_t newColorValue = i * step;
 
                 uint16_t r = lastColorValue * (lastColor == 0) + newColorValue * (color == 0);
                 uint16_t g = lastColorValue * (lastColor == 1) + newColorValue * (color == 1);
                 uint16_t b = lastColorValue * (lastColor == 2) + newColorValue * (color == 2);
-                uint16_t ww = lastColorValue * (lastColor == 3) + newColorValue * (color == 3);
-                uint16_t nw = lastColorValue * (lastColor == 4) + newColorValue * (color == 4);
-                uint16_t cw = lastColorValue * (lastColor == 5) + newColorValue * (color == 5);
+                uint16_t ww = (lastColorValue * (lastColor == 3) + newColorValue * (color == 3)) >> 2;
+                uint16_t nw = (lastColorValue * (lastColor == 4) + newColorValue * (color == 4)) >> 2;
+                uint16_t cw = (lastColorValue * (lastColor == 5) + newColorValue * (color == 5)) >> 2;
 
-                rgbClearTo(Rgb48Color(r, g, b));
+                rgbClearTo(Rgb48Color(r << 8, g << 8, b << 8));
                 //RGBStrip.SetPixelColor(0, Rgb48Color(r, g, b));
                 //RGBStrip.SetPixelColor(1, Rgb48Color(0, 255, 0));
                 //RGBStrip.SetPixelColor(2, Rgb48Color(0, 0, 255));
