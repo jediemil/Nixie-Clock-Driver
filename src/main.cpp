@@ -307,7 +307,7 @@ unsigned long getTimeUnix() {
     }
     time(&now);
     return now;*/
-    return now();
+    return UTC.now();
 }
 
 void setColonVis(bool visibility) {
@@ -498,13 +498,12 @@ void showDate() {
     tubes.setVisibility(false);
     //struct tm timeNow;
     //getLocalTime(&timeNow);
-    time_t timeNow = now();
 
-    int dayNow = day(timeNow);
+    int dayNow = day(TIME_NOW);
     tubes.setNumber(0, dayNow/10); //Int division -> remove the last digit
     tubes.setNumber(1, dayNow%10);
 
-    int monthNow = month(timeNow) + 1;
+    int monthNow = month(LAST_READ) + 1;
     tubes.setNumber(2, monthNow/10);
     tubes.setNumber(3, monthNow%10);
     //Display something on SC Tubes?
@@ -538,13 +537,12 @@ void showDate() {
         while (showTime) {
             //struct tm timeNow;
             //getLocalTime(&timeNow);
-            time_t timeNow = now();
 
-            int hourNow = hour(timeNow);
+            int hourNow = hour(TIME_NOW);
             tubes.setNumber(0, hourNow/10); //Int division -> remove the last digit
             tubes.setNumber(1, hourNow%10);
 
-            int minuteNow = minute(timeNow);
+            int minuteNow = minute(LAST_READ);
             tubes.setNumber(2, minuteNow/10);
             tubes.setNumber(3, minuteNow%10);
 
@@ -573,7 +571,7 @@ void showDate() {
 
         //struct tm timeNow;
         //getLocalTime(&timeNow);
-        if (minute(now()) % 10 < 2 || forceExtraTubeInfo)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
+        if (minute(TIME_NOW) % 10 < 2 || forceExtraTubeInfo)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
             showWeather();
         } else {
             antiCathodePoisonRoutine(1000, true);
@@ -588,7 +586,7 @@ void showDate() {
         //struct tm timeNow;
         //getLocalTime(&timeNow);
 
-        if (animENTable[hour(now())]) {
+        if (animENTable[hour(TIME_NOW)]) {
             int color = random(0, 5);
             uint32_t steps = random(255, 1000);
             double step = 1.0 / steps;
@@ -728,6 +726,9 @@ void setup() {
     delay(100);
     Serial.println("Connecting WiFi");
 
+    whiteStrip.ClearTo(RgbColor(0, 0, 0));
+    whiteStrip.Show();
+
     connectWiFi();
 
     Serial.println("WiFi connected");
@@ -745,8 +746,10 @@ void setup() {
 
     //configTime(3600, 3600, "pool.ntp.org");
     waitForSync();
-    Timezone timezone;
-    timezone.setLocation(F("Europe/Stockholm"));
+
+    timezone.setLocation(F("Europe/Berlin"));
+    timezone.setPosix("CET-1CEST,M3.5.0,M10.5.0/3");
+    timezone.setDefault();
     Serial.println(dateTime(RFC850));
 
     Serial.println("WebServer Started");
@@ -764,9 +767,6 @@ void setup() {
     ledcWrite(0, 0);
     digitalWrite(STATUS_LED, LOW);
 
-    whiteStrip.ClearTo(RgbColor(0, 0, 0));
-    whiteStrip.Show();
-
     //RGBStrip.ClearTo(Rgb48Color(0, 0, 0));
     RGBStrip.ClearTo(RgbColor(0, 0, 0));
     RGBStrip.Show();
@@ -783,7 +783,8 @@ void setup() {
 
     //struct tm timeNow;
     //getLocalTime(&timeNow);
-    uint8_t hourNow = hour(now());
+    uint8_t hourNow = hour(TIME_NOW);
+    //Serial.println(hourNow);
 
     if (dayENTable[hourNow]) {
         startTubes();
@@ -808,7 +809,7 @@ void loop() {
         WiFi.reconnect();
     }
 
-    uint8_t hourNow = hour(now());
+    uint8_t hourNow = hour(TIME_NOW);
 
     if (!manualTubes) {
         if (tubesRunning && !dayENTable[hourNow]) {

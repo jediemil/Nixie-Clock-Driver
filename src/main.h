@@ -93,6 +93,8 @@ const char file_html[] PROGMEM = R"rawliteral(
 NeoPixelBus<NeoRgbFeature, NeoEsp32I2s0800KbpsInvertedMethod> whiteStrip(NUM_LEDS, 22);
 NeoPixelBus<NeoGrb48Feature, NeoEsp32Rmt0800KbpsInvertedMethod> RGBStrip(NUM_LEDS, 23);
 
+Timezone timezone;
+
 int lookup1[] = {38, 45, 46, 47, 43, 42, 41, 40, 36, 37, 44, 39};
 auto tube1 = new IN14Tube(lookup1);
 
