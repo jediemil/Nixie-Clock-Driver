@@ -14,11 +14,12 @@
 #include <ESPmDNS.h>
 #include "SPIFFS.h"
 #include <esp_task_wdt.h>
-#include "time.h"
-#include <Time.h>
+//#include "time.h"
+//#include <Time.h>
 #include <HTTPClient.h>
-#include "TimeLib.h"
+//#include "TimeLib.h"
 #include <ArduinoJSON.h>
+#include "./../.pio/libdeps/esp32dev/ezTime/src/ezTime.h"
 
 
 #include <Update.h>

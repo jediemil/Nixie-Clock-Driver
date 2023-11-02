@@ -298,54 +298,26 @@ void startServer() {
     });
 }
 
-void printLocalTime(){
-    struct tm timeinfo;
-    if(!getLocalTime(&timeinfo)){
-        Serial.println("Failed to obtain time");
-        return;
-    }
-    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-    Serial.print("Day of week: ");
-    Serial.println(&timeinfo, "%A");
-    Serial.print("Month: ");
-    Serial.println(&timeinfo, "%B");
-    Serial.print("Day of Month: ");
-    Serial.println(&timeinfo, "%d");
-    Serial.print("Year: ");
-    Serial.println(&timeinfo, "%Y");
-    Serial.print("Hour: ");
-    Serial.println(&timeinfo, "%H");
-    Serial.print("Hour (12 hour format): ");
-    Serial.println(&timeinfo, "%I");
-    Serial.print("Minute: ");
-    Serial.println(&timeinfo, "%M");
-    Serial.print("Second: ");
-    Serial.println(&timeinfo, "%S");
-
-    Serial.println("Time variables");
-    char timeHour[3];
-    strftime(timeHour,3, "%H", &timeinfo);
-    Serial.println(timeHour);
-    char timeWeekDay[10];
-    strftime(timeWeekDay,10, "%A", &timeinfo);
-    Serial.println(timeWeekDay);
-    Serial.println();
-}
-
 unsigned long getTimeUnix() {
-    time_t now;
+    /*time_t now;
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) {
         //Serial.println("Failed to obtain time");
         return(0);
     }
     time(&now);
-    return now;
+    return now;*/
+    return now();
 }
 
 void setColonVis(bool visibility) {
     digitalWrite(COLON_1_PIN, visibility);
     digitalWrite(COLON_2_PIN, visibility);
+}
+
+void setColonVis(bool visibility1, bool visibility2) {
+    digitalWrite(COLON_1_PIN, visibility1);
+    digitalWrite(COLON_2_PIN, visibility2);
 }
 
 void antiCathodePoisonRoutine(int speed, bool reset) {
@@ -378,7 +350,7 @@ void getWeather() {
     unixTime += 24*60*60;
     time_t newTime = unixTime;
 
-    String monthNow = String(month(newTime));
+    /*String monthNow = String(month(newTime));
     String dayNow = String(day(newTime));
 
     if (monthNow.length() < 2) {
@@ -386,7 +358,10 @@ void getWeather() {
     }
     if (dayNow.length() < 2) {
         dayNow = "0" + dayNow;
-    }
+    }*/
+
+    String monthNow = dateTime(newTime, "m");
+    String dayNow = dateTime(newTime, "d");
 
     String code = String(year(newTime)) + "-" + monthNow + "-" + dayNow + "T14:00:00Z";
     Serial.println(code);
@@ -521,14 +496,15 @@ void showDate() {
     // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
     //Show temp and date here
     tubes.setVisibility(false);
-    struct tm timeNow;
-    getLocalTime(&timeNow);
+    //struct tm timeNow;
+    //getLocalTime(&timeNow);
+    time_t timeNow = now();
 
-    int dayNow = timeNow.tm_mday;
+    int dayNow = day(timeNow);
     tubes.setNumber(0, dayNow/10); //Int division -> remove the last digit
     tubes.setNumber(1, dayNow%10);
 
-    int monthNow = timeNow.tm_mon + 1;
+    int monthNow = month(timeNow) + 1;
     tubes.setNumber(2, monthNow/10);
     tubes.setNumber(3, monthNow%10);
     //Display something on SC Tubes?
@@ -556,28 +532,36 @@ void showDate() {
 [[noreturn]] void normalTubeLoop(void * parameter) {
     tubes.setVisibilityNUM(true);
     while (true) {
-        struct tm timeStart;
-        getLocalTime(&timeStart);
+        //struct tm timeStart;
+        //getLocalTime(&timeStart);
         bool showTime = true;
         while (showTime) {
-            struct tm timeNow;
-            getLocalTime(&timeNow);
+            //struct tm timeNow;
+            //getLocalTime(&timeNow);
+            time_t timeNow = now();
 
-            int hour = timeNow.tm_hour;
-            tubes.setNumber(0, hour/10); //Int division -> remove the last digit
-            tubes.setNumber(1, hour%10);
+            int hourNow = hour(timeNow);
+            tubes.setNumber(0, hourNow/10); //Int division -> remove the last digit
+            tubes.setNumber(1, hourNow%10);
 
-            int minute = timeNow.tm_min;
-            tubes.setNumber(2, minute/10);
-            tubes.setNumber(3, minute%10);
+            int minuteNow = minute(timeNow);
+            tubes.setNumber(2, minuteNow/10);
+            tubes.setNumber(3, minuteNow%10);
 
             tubes.showNUM();
 
-            if (minute % TEMP_INTERVAL == 0 || forceExtraTubeInfo) {
+            if (minuteNow % TEMP_INTERVAL == 0 || forceExtraTubeInfo) {
                 showTime = false;
             }
 
-            for (int i = 0; i < 30 - timeNow.tm_sec/2; i++) {
+            /*for (int i = 0; i < 30 - timeNow.tm_sec/2; i++) {
+                setColonVis(false);
+                delay(1000);
+                setColonVis(true);
+                delay(1000);
+                esp_task_wdt_reset();
+            }*/
+            while (!minuteChanged()) {
                 setColonVis(false);
                 delay(1000);
                 setColonVis(true);
@@ -587,9 +571,9 @@ void showDate() {
         }
         showDate();
 
-        struct tm timeNow;
-        getLocalTime(&timeNow);
-        if (timeNow.tm_min % 10 < 2 || forceExtraTubeInfo)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
+        //struct tm timeNow;
+        //getLocalTime(&timeNow);
+        if (minute(now()) % 10 < 2 || forceExtraTubeInfo)  { //If the last digit of minute is less than 2, only show weather every 10 minute with the 5 minute date interval.
             showWeather();
         } else {
             antiCathodePoisonRoutine(1000, true);
@@ -601,10 +585,10 @@ void showDate() {
 [[noreturn]] void clockOffLoop(void * args) {
     int lastColor = random(0, 5);
     while (true) {
-        struct tm timeNow;
-        getLocalTime(&timeNow);
+        //struct tm timeNow;
+        //getLocalTime(&timeNow);
 
-        if (animENTable[timeNow.tm_hour]) {
+        if (animENTable[hour(now())]) {
             int color = random(0, 5);
             uint32_t steps = random(255, 1000);
             double step = 1.0 / steps;
@@ -759,8 +743,11 @@ void setup() {
     startServer();
     server.begin();
 
-    configTime(3600, 3600, "pool.ntp.org");
-    printLocalTime();
+    //configTime(3600, 3600, "pool.ntp.org");
+    waitForSync();
+    Timezone timezone;
+    timezone.setLocation(F("Europe/Stockholm"));
+    Serial.println(dateTime(RFC850));
 
     Serial.println("WebServer Started");
     delay(100);
@@ -794,10 +781,11 @@ void setup() {
 
     Serial.println("WDT and tube started");
 
-    struct tm timeNow;
-    getLocalTime(&timeNow);
+    //struct tm timeNow;
+    //getLocalTime(&timeNow);
+    uint8_t hourNow = hour(now());
 
-    if (dayENTable[timeNow.tm_hour]) {
+    if (dayENTable[hourNow]) {
         startTubes();
     } else {
         shutDownTubes();
@@ -809,7 +797,7 @@ int loopI = 0;
 void loop() {
     delay(2000);
     esp_task_wdt_reset(); // TODO Better cathode poisoning algorithm need to be added, and also resyncing and long cathode poisoning program at night. Also turn the clock off at specified times.
-
+    events();
     // https://www.manula.com/manuals/daliborfarny-com/nixie-tubes/1/en/topic/cathode-poisoning-prevention-routine
     // For Dalibor Farny Tubes use ratio 60 : 0.2 seconds.
 
@@ -820,11 +808,10 @@ void loop() {
         WiFi.reconnect();
     }
 
-    struct tm timeNow;
-    getLocalTime(&timeNow);
+    uint8_t hourNow = hour(now());
 
     if (!manualTubes) {
-        if (tubesRunning && !dayENTable[timeNow.tm_hour]) {
+        if (tubesRunning && !dayENTable[hourNow]) {
             esp_task_wdt_delete(normalTubeRunnerHandle);
             vTaskDelete(normalTubeRunnerHandle);
 
@@ -837,7 +824,7 @@ void loop() {
 
             shutDownTubes();
 
-        } else if (!tubesRunning && dayENTable[timeNow.tm_hour]) {
+        } else if (!tubesRunning && dayENTable[hourNow]) {
             esp_task_wdt_delete(normalTubeRunnerHandle);
             vTaskDelete(normalTubeRunnerHandle);
 
@@ -859,9 +846,9 @@ void loop() {
         Serial.println("Do weather");
         getWeather();
         Serial.println("Weather done");
-        Serial.println("Re-sync time");
-        configTime(3600, 3600, "pool.ntp.org");
-        Serial.println("Time re-synced");
+        //Serial.println("Re-sync time");
+        //configTime(3600, 3600, "pool.ntp.org");
+        //Serial.println("Time re-synced");
     }
 
 
